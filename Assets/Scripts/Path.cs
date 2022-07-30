@@ -11,14 +11,12 @@ using System;
 public class Path : MonoBehaviour
 {
     [Tooltip("People prefabs na")] public GameObject[] people;
-    [Tooltip("Density of people")] [Range(0.01f, 0.50f)] public float Density = 0.2f;
+    [Tooltip("Density of people")] [Range(0.01f, 0.50f)] public float density = 0.2f;
 
     [Tooltip("Distance between people")][Range(1f, 10f)] public float socialDistance = 0.1f;
     [Tooltip("Make the path closed in the ring")] public bool loopPath;
 
     [Tooltip("Offset from the line along the X axis")] public Vector2 randPos = new Vector2(0.1f, 0.1f);
-
-    protected float[] _distances;
 
     [HideInInspector] public int numGizmosLines = 8;
     [HideInInspector] public float lineSpacing = 0.6f;
@@ -37,7 +35,7 @@ public class Path : MonoBehaviour
         waypoints = new List<GameObject>();
 
         // Unity magic. Don't ask - actually somehow we can loop transform itself to get all its gameobjects
-        foreach (Transform t in transform) {
+        foreach (Transform t in transform.GetChild(0)) {
             waypoints.Add(t.gameObject);
         }
     }

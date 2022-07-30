@@ -44,10 +44,13 @@ public class Crowd : MonoBehaviour {
         info.animationName = run ? "run" : "walk";
     }
 
-    public bool isSameVector(Vector3 a, Vector3 b) {
+    public static bool isSameVector(Vector3 a, Vector3 b) {
         return (a-b).magnitude < 1e-5;
     }
 
+    public static float HDist(Vector3 a, Vector3 b) {
+        return Vector3.Distance(Vector3.ProjectOnPlane(a, Vector3.up), Vector3.ProjectOnPlane(b, Vector3.up));
+    }
 
     // Start is called once in the beginning. Initialize the animation controller at the start.
     void Start()
@@ -89,7 +92,7 @@ public class Crowd : MonoBehaviour {
         Vector3 targetPos = new Vector3(finishPos.x, transform.position.y, finishPos.z);
 
         // Calculate the horizontal straight line distance between the current position and the finish position
-        float hDist = Vector3.Distance(Vector3.ProjectOnPlane(transform.position, Vector3.up), Vector3.ProjectOnPlane(finishPos, Vector3.up));
+        float hDist = HDist(transform.position, finishPos);
         
         // If close enough to the next waypoint then we perform some additional updates on waypoints
         bool hasNextWaypoint = info.currentTargetIdx < info.n;
