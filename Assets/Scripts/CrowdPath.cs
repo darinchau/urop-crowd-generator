@@ -15,8 +15,8 @@ public class CrowdPath : Path
 
     [Tooltip("Add a bit of UnityEngine.Randomness to the finishing position")] [SerializeField] private Vector2 randFinish = new Vector2(0.1f, 0.1f);
 
-    private int RecalculatePoint() {
-        if (numGizmosLines < 1) numGizmosLines = 1;
+    public override int RecalculatePoint() {
+        if (pathWidth < 1) pathWidth = 1;
         if (lineSpacing < 0.6f) lineSpacing = 0.6f;
 
         // Number of waypoints. First add the first waypoint to th list if we should loop the path
@@ -27,7 +27,7 @@ public class CrowdPath : Path
 
         // Now assign length to the points 2D array
         // First index is vertically, second index is horizontally
-        points = new Vector3[numGizmosLines, n + 2];
+        points = new Vector3[pathWidth, n + 2];
 
         // Create a vector from one waypoint to the next to draw the gizmos
         for (int i = 0; i < n; i++)
@@ -57,17 +57,19 @@ public class CrowdPath : Path
             Vector3 shear = Vector3.Normalize((Quaternion.Euler(0, 90, 0) * (vectorStart + vectorEnd)));
 
             // Assign the first vertical waypoint, if there is more than one waypoint then assign the rest
-            points[0, i + 1] = numGizmosLines % 2 == 1 ? waypoints[i].transform.position : waypoints[i].transform.position + shear * lineSpacing / 2;
-            if (numGizmosLines > 1) points[1, i + 1] = points[0, i + 1] - shear * lineSpacing;
+            // Use the scale x to determine an additional shear factor
+            float shearFactor = waypoints[i].transform.localScale.x;
+            points[0, i + 1] = pathWidth % 2 == 1 ? waypoints[i].transform.position : waypoints[i].transform.position + shear * (lineSpacing * shearFactor / 2);
+            if (pathWidth > 1) points[1, i + 1] = points[0, i + 1] - shear * lineSpacing * shearFactor;
 
-            for (int w = 1; w < numGizmosLines; w++)
+            for (int w = 1; w < pathWidth; w++)
             {
-                points[w, i + 1] = points[0, i + 1] + shear * lineSpacing * (float) (Math.Pow(-1, w)) * ((w + 1) / 2);
+                points[w, i + 1] = points[0, i + 1] + shear * lineSpacing * shearFactor * (float) (Math.Pow(-1, w)) * ((w + 1) / 2);
             }
         }
 
         // Duplicate the first and last waypoints for every path
-        for (int w = 0; w < numGizmosLines; w++)
+        for (int w = 0; w < pathWidth; w++)
         {
             points[w, 0] = points[w, 1];
             points[w, n + 1] = points[w, n];
@@ -85,7 +87,7 @@ public class CrowdPath : Path
 
         // Now we actually draw the Gizmos
         Gizmos.color = Color.green;
-        for (int w = 0; w < numGizmosLines; w++)
+        for (int w = 0; w < pathWidth; w++)
         {
             for (int i = 1; i < n; i++) Gizmos.DrawLine(points[w, i + 1], points[w, i]);
         }
@@ -106,6 +108,12 @@ public class CrowdPath : Path
         int appearanceIdx = UnityEngine.Random.Range(0, people.Length);
 
         Vector2 randFinishPos = new Vector2(UnityEngine.Random.Range(-randFinish.x, randFinish.x), UnityEngine.Random.Range(-randFinish.y, randFinish.y));
+
+        // Make a vector 3 array to hold the pathIdx specified information of waypoints
+        Vector3[] specPoints = new Vector3[n + 2];
+        for (int i = 0; i < n + 2; i++) {
+            specPoints[i] = points[pathIdx, i];
+        }
         
         // Create the person somewhere between the given wpindex and the previous one. If the given is 1 or given is n then since 0-1, and n-n+1 are duplicates anyway so there is nothing in betweens
         int prevWpIndex, nextWpIndex;
@@ -122,7 +130,9 @@ public class CrowdPath : Path
         }
 
         float randAt = UnityEngine.Random.Range(0f, 1f);
-        Vector3 spawnPos = points[pathIdx, prevWpIndex] * randAt + points[pathIdx, nextWpIndex] * (1 - randAt);
+        Vector3 spawnPos = specPoints[prevWpIndex] * randAt + specPoints[nextWpIndex] * (1 - randAt);
+
+
 
         // Now create the person
         Transform personParent = transform.Find("people");
@@ -131,16 +141,16 @@ public class CrowdPath : Path
         person.transform.parent = personParent;
         Crowd crowd = person.AddComponent<Crowd>();
 
-        crowd.InitializePerson(pathIdx, nextWpIndex, run, back, speed, this, randFinishPos);
+        crowd.InitializePerson(pathIdx, nextWpIndex, run, back, speed, this, randFinishPos, specPoints);
     }
 
     // TODO use inverse transform sampling to make people more evenly distributed
     public override void Populate()
     {
-        int numPerson = (int)(density * waypoints.Count * numGizmosLines);
+        int numPerson = (int)(density * waypoints.Count * pathWidth);
 
         for (int i = 0; i < numPerson; i++) {
-            int pathIdx = UnityEngine.Random.Range(0, numGizmosLines);
+            int pathIdx = UnityEngine.Random.Range(0, pathWidth);
             SpawnPerson(pathIdx, false);
         }
     }
@@ -161,12 +171,12 @@ public class CrowdPath : Path
         return variance * sum + mean;
     }
 
-    public static int GenerateEvenNextWpIdx(int pathIdx) {
+    public int GenerateEvenNextWpIdx(int pathIdx) {
         float[] dists = new float[waypoints.Count - 1];
         float totalDist = 0;
 
         for(int i = 1; i < waypoints.Count; i++) {
-            float hDist =  HDist(points[pathIdx, i], points[pathIdx, i-1]);
+            float hDist =  Crowd.HDist(points[pathIdx, i], points[pathIdx, i-1]);
             dists[i - 1] = hDist;
             totalDist += hDist;
         }

@@ -2,7 +2,8 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
-struct CrowdInfo {
+[System.Serializable]
+public struct CrowdInfo {
     // Runtime constants (more or less)
     public float speed;
     public bool run;
@@ -17,6 +18,7 @@ struct CrowdInfo {
     // Total number of waypoints
     public int n;
     public List<GameObject> waypoints;
+    public Vector3[] specifiedPoints;
 
     // Runtime variables
     public int currentTargetIdx;
@@ -24,9 +26,11 @@ struct CrowdInfo {
 
 [System.Serializable]
 public class Crowd : MonoBehaviour {
-    CrowdInfo info;
+    [SerializeField] CrowdInfo info;
 
-    public void InitializePerson(int pathIdx, int nextWpIndex, bool run, bool back, float speed, Path path, Vector2 finishPos) {
+    public void InitializePerson(int pathIdx, int nextWpIndex, bool run, bool back, float speed, Path path, Vector2 finishPos, Vector3[] specPoints) {
+        // Make a new crowd info
+        info = new CrowdInfo();
         info.speed = speed;
         info.run = run;
         info.loop = path.loopPath;
@@ -36,11 +40,11 @@ public class Crowd : MonoBehaviour {
         info.xFinish = finishPos.x;
         info.zFinish = finishPos.y;
 
+        // Initialize some additional variables for our convenience
+        info.specifiedPoints = specPoints;
         info.n = path.waypoints.Count;
         info.waypoints = path.waypoints;
-
         info.currentTargetIdx = nextWpIndex;
-
         info.animationName = run ? "run" : "walk";
     }
 
@@ -74,7 +78,7 @@ public class Crowd : MonoBehaviour {
         // If there is something directly in front, then probe the environment and attempt to go around whatever that is, and recalculate the target direction vector
         // Move according to the target
 
-        Vector3 baseFinishPos = info.waypoints[info.currentTargetIdx].transform.position;
+        Vector3 baseFinishPos = info.specifiedPoints[info.currentTargetIdx];
 
         // Perform raycast to handle slopes
         RaycastHit hit;
@@ -95,12 +99,12 @@ public class Crowd : MonoBehaviour {
         float hDist = HDist(transform.position, finishPos);
         
         // If close enough to the next waypoint then we perform some additional updates on waypoints
-        bool hasNextWaypoint = info.currentTargetIdx < info.n;
-        bool closeEnough = (info.run && hDist < 0.5f) || (!info.run && hDist < 0.2f);
+        bool hasNextWaypoint = (!info.back && info.currentTargetIdx < info.n) || (info.back && info.currentTargetIdx > 0);
+        bool closeEnough = (info.run && hDist < 0.3f) || (!info.run && hDist < 0.1f);
 
         if (closeEnough && hasNextWaypoint) {
-            int nextIdx = info.back ? info.currentTargetIdx + 1 : info.currentTargetIdx - 1;
-            targetPos = info.path.points[info.pathIdx, info.currentTargetIdx + 1];
+            int nextIdx = info.back ? info.currentTargetIdx - 1 : info.currentTargetIdx + 1;
+            targetPos = info.specifiedPoints[nextIdx];
             targetPos.y = transform.position.y;
             info.currentTargetIdx = nextIdx;
         }

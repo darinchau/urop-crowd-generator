@@ -31,5 +31,11 @@ public class CrowdPathEditor : Editor
         }
 
         EditorGUILayout.Space();
+
+        if (GUILayout.Button("Destroy Humans"))
+        {
+            path.KillAllHumans();
+        }
+
     }
 }
