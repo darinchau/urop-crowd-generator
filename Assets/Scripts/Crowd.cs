@@ -7,33 +7,39 @@ public struct CrowdInfo {
     // Runtime constants (more or less)
     public float speed;
     public bool run;
-    public bool loop;
-    public bool back;
-    public Path path;
-    public int pathIdx;
     public float xFinish;
     public float zFinish;
     public string animationName;
 
     // Total number of waypoints
-    public int n;
-    public List<GameObject> waypoints;
-    public Vector3[] specifiedPoints;
+    public Vector3[] specPoints;
 
     // Runtime variables
     public int currentTargetIdx;
+
+    // Information about the path
+    public bool back;
+    public Path path;
+    public int pathIdx;
+
+    // Check the diverge. Rejected is the previously rejected waypoints so we do not recalculate it on every frame
+    // Divergable is like the frame count. If divergable == 0 then we can diverge
+    public float divergable;
+    public List<GameObject> rejected;
+
+    // We need to update the specifiedPoints, currentTargetIdx, back, path shall we diverge
 }
 
 [System.Serializable]
 public class Crowd : MonoBehaviour {
     [SerializeField] CrowdInfo info;
+    CrowdManager cm;
 
     public void InitializePerson(int pathIdx, int nextWpIndex, bool run, bool back, float speed, Path path, Vector2 finishPos, Vector3[] specPoints) {
         // Make a new crowd info
         info = new CrowdInfo();
         info.speed = speed;
         info.run = run;
-        info.loop = path.loopPath;
         info.back = back;
         info.path = path;
         info.pathIdx = pathIdx;
@@ -41,19 +47,12 @@ public class Crowd : MonoBehaviour {
         info.zFinish = finishPos.y;
 
         // Initialize some additional variables for our convenience
-        info.specifiedPoints = specPoints;
-        info.n = path.waypoints.Count;
-        info.waypoints = path.waypoints;
+        info.specPoints = specPoints;
         info.currentTargetIdx = nextWpIndex;
         info.animationName = run ? "run" : "walk";
-    }
 
-    public static bool isSameVector(Vector3 a, Vector3 b) {
-        return (a-b).magnitude < 1e-5;
-    }
-
-    public static float HDist(Vector3 a, Vector3 b) {
-        return Vector3.Distance(Vector3.ProjectOnPlane(a, Vector3.up), Vector3.ProjectOnPlane(b, Vector3.up));
+        info.divergable = 0f;
+        info.rejected = new List<GameObject>();
     }
 
     // Start is called once in the beginning. Initialize the animation controller at the start.
@@ -62,6 +61,7 @@ public class Crowd : MonoBehaviour {
         Animator animator = GetComponent<Animator>();
         animator.CrossFade(info.animationName, 0.1f, 0, Random.Range(0.0f, 1.0f));
         animator.speed = info.run ? info.speed / 3f : info.speed * 1.2f;
+        cm = CrowdManager.Instance;
     }
 
     // Update is called once every frame. This updates the position of humans
@@ -69,6 +69,7 @@ public class Crowd : MonoBehaviour {
     void Update ()
     {   
         // Set base finish position, handle slopes and calculate target
+        // Check diverge
         // Calculate current distance (horizontal) to target
         // If close enough to the finish and we are really finishing on the path
         //      Destroy oneself and spawn another human
@@ -78,7 +79,8 @@ public class Crowd : MonoBehaviour {
         // If there is something directly in front, then probe the environment and attempt to go around whatever that is, and recalculate the target direction vector
         // Move according to the target
 
-        Vector3 baseFinishPos = info.specifiedPoints[info.currentTargetIdx];
+        // Check divergence, and update base finish pos to specifiedPoints[currentTargetIdx]
+        Vector3 baseFinishPos = cm.Diverge(transform.position, ref info.pathIdx, ref info.specPoints, ref info.currentTargetIdx, ref info.back, ref info.path, ref info.rejected, ref info.divergable);
 
         // Perform raycast to handle slopes
         RaycastHit hit;
@@ -96,19 +98,18 @@ public class Crowd : MonoBehaviour {
         Vector3 targetPos = new Vector3(finishPos.x, transform.position.y, finishPos.z);
 
         // Calculate the horizontal straight line distance between the current position and the finish position
-        float hDist = HDist(transform.position, finishPos);
+        float hDist = CrowdManager.HDist(transform.position, finishPos);
         
         // If close enough to the next waypoint then we perform some additional updates on waypoints
-        bool hasNextWaypoint = (!info.back && info.currentTargetIdx < info.n) || (info.back && info.currentTargetIdx > 0);
-        bool closeEnough = (info.run && hDist < 0.3f) || (!info.run && hDist < 0.1f);
+        bool hasNextWaypoint = (!info.back && info.currentTargetIdx < info.path.waypoints.Count) || (info.back && info.currentTargetIdx > 0);
 
-        if (closeEnough && hasNextWaypoint) {
+        if (hDist < info.speed * cm.closeEnoughDistance && hasNextWaypoint) {
             int nextIdx = info.back ? info.currentTargetIdx - 1 : info.currentTargetIdx + 1;
-            targetPos = info.specifiedPoints[nextIdx];
+            targetPos = info.specPoints[nextIdx];
             targetPos.y = transform.position.y;
             info.currentTargetIdx = nextIdx;
         }
-        else if (closeEnough && !hasNextWaypoint) {
+        else if (hDist < info.speed * cm.closeEnoughFinalDistance && !hasNextWaypoint) {
             // Close enough to final waypoint. Time to kill
             // GG na
             info.path.SpawnPerson(info.pathIdx, true);
@@ -117,20 +118,24 @@ public class Crowd : MonoBehaviour {
 
         // Move towards the target
         Vector3 targetVector = targetPos - transform.position;
+        // Avoid rubberbanding if the next waypoint is super far away
+        targetVector.Normalize();
 
-        // Perform probing here
+        // TODO Perform probing here
 
         // This just makes sure there is no divide by zero error in runtime. Practically this always runs.
         // Update the look direction of humans
         if(targetVector != Vector3.zero)
         {
             Vector3 newDir = Vector3.zero;
-            newDir = Vector3.RotateTowards(transform.forward, targetVector, 2 * Time.deltaTime, 0.0f);
+            newDir = Vector3.RotateTowards(transform.forward, targetVector, cm.rotationSpeed * info.speed * Time.deltaTime, 0.0f);
             transform.rotation = Quaternion.LookRotation(newDir);
         }
 
-        if (Time.deltaTime > 0)
-            transform.position = Vector3.MoveTowards(transform.position, finishPos, Time.deltaTime * 1.0f * info.speed);
-    }
+        Debug.DrawRay(transform.position, transform.forward);
 
+        // Move the human a bit forward taking into consideration its rotation
+        float magnitude = Time.deltaTime * 1.0f * info.speed;
+        transform.position += targetVector * magnitude;
+    }
 }

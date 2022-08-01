@@ -15,7 +15,7 @@ public class CrowdPath : Path
 
     [Tooltip("Add a bit of UnityEngine.Randomness to the finishing position")] [SerializeField] private Vector2 randFinish = new Vector2(0.1f, 0.1f);
 
-    public override int RecalculatePoint() {
+    public override Vector3[,] RecalculatePoint() {
         if (pathWidth < 1) pathWidth = 1;
         if (lineSpacing < 0.6f) lineSpacing = 0.6f;
 
@@ -23,11 +23,12 @@ public class CrowdPath : Path
         if (loopPath) waypoints.Add(waypoints[0]);
         int n = waypoints.Count;
 
-        if (n < 2) return -1;
+        // If there is no waypoints
+        if (n < 2) return base.RecalculatePoint();
 
         // Now assign length to the points 2D array
         // First index is vertically, second index is horizontally
-        points = new Vector3[pathWidth, n + 2];
+        Vector3[,] points = new Vector3[pathWidth, n + 2];
 
         // Create a vector from one waypoint to the next to draw the gizmos
         for (int i = 0; i < n; i++)
@@ -75,15 +76,17 @@ public class CrowdPath : Path
             points[w, n + 1] = points[w, n];
         }
 
-        return n;
+        return points;
     }
 
 
     // Draw the curve gizmos
     public override void DrawCurveGizmos()
     {
-        int n = RecalculatePoint();
-        if (n < 0) return;
+        int n = waypoints.Count;
+        if (n < 2) return;
+
+        Vector3[,] points = RecalculatePoint();
 
         // Now we actually draw the Gizmos
         Gizmos.color = Color.green;
@@ -97,7 +100,8 @@ public class CrowdPath : Path
     public override void SpawnPerson(int pathIdx, bool startAtBeginning)
     {
         // This recalculates the waypoints
-        int n = RecalculatePoint();
+        Vector3[,] points = RecalculatePoint();
+        int n = waypoints.Count;
 
         // Randomly generate the profile of the human
         bool run = UnityEngine.Random.value <= runningProportion;
@@ -110,29 +114,24 @@ public class CrowdPath : Path
         Vector2 randFinishPos = new Vector2(UnityEngine.Random.Range(-randFinish.x, randFinish.x), UnityEngine.Random.Range(-randFinish.y, randFinish.y));
 
         // Make a vector 3 array to hold the pathIdx specified information of waypoints
-        Vector3[] specPoints = new Vector3[n + 2];
-        for (int i = 0; i < n + 2; i++) {
-            specPoints[i] = points[pathIdx, i];
-        }
+        Vector3[] specPoints = GetSpecPoints(pathIdx);
         
         // Create the person somewhere between the given wpindex and the previous one. If the given is 1 or given is n then since 0-1, and n-n+1 are duplicates anyway so there is nothing in betweens
         int prevWpIndex, nextWpIndex;
 
         if (back) 
         {
-            prevWpIndex = startAtBeginning ? n + 1 : GenerateEvenNextWpIdx(pathIdx);
+            prevWpIndex = startAtBeginning ? n + 1 : GenerateEvenNextWpIdx(specPoints);
             nextWpIndex = prevWpIndex - 1;
         }
         else 
         {
-            nextWpIndex = startAtBeginning ? 1 : GenerateEvenNextWpIdx(pathIdx);
+            nextWpIndex = startAtBeginning ? 1 : GenerateEvenNextWpIdx(specPoints);
             prevWpIndex = nextWpIndex - 1;
         }
 
         float randAt = UnityEngine.Random.Range(0f, 1f);
         Vector3 spawnPos = specPoints[prevWpIndex] * randAt + specPoints[nextWpIndex] * (1 - randAt);
-
-
 
         // Now create the person
         Transform personParent = transform.Find("people");
@@ -171,12 +170,12 @@ public class CrowdPath : Path
         return variance * sum + mean;
     }
 
-    public int GenerateEvenNextWpIdx(int pathIdx) {
+    public int GenerateEvenNextWpIdx(Vector3[] specPoints) {
         float[] dists = new float[waypoints.Count - 1];
         float totalDist = 0;
 
         for(int i = 1; i < waypoints.Count; i++) {
-            float hDist =  Crowd.HDist(points[pathIdx, i], points[pathIdx, i-1]);
+            float hDist =  CrowdManager.HDist(specPoints[i], specPoints[i-1]);
             dists[i - 1] = hDist;
             totalDist += hDist;
         }
@@ -192,4 +191,13 @@ public class CrowdPath : Path
         return 1;
     }
 
+    public override Vector3[] GetSpecPoints(int pathIdx) {
+        Vector3[,] points = RecalculatePoint();
+        int n = waypoints.Count;
+        Vector3[] specPoints = new Vector3[n + 2];
+        for (int i = 0; i < n + 2; i++) {
+            specPoints[i] = points[pathIdx, i];
+        }
+        return specPoints;
+    }
 }
