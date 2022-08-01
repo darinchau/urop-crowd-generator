@@ -153,7 +153,10 @@ public class CrowdPath : Path
     // TODO use inverse transform sampling to make people more evenly distributed
     public override void Populate()
     {
-        int numPerson = (int)(density * waypoints.Count * pathWidth);
+        RecalculatePoint();
+        float totalDist = GetDist(points[0], out float[] dists);
+
+        int numPerson = (int)(density * totalDist * pathWidth / 3f);
 
         for (int i = 0; i < numPerson; i++) {
             int pathIdx = UnityEngine.Random.Range(0, pathWidth);
@@ -178,15 +181,7 @@ public class CrowdPath : Path
     }
 
     public int GenerateEvenNextWpIdx(Vector3[] specPoints) {
-        float[] dists = new float[specPoints.Length - 1];
-        float totalDist = 0;
-
-        for(int i = 1; i < specPoints.Length; i++) {
-            float hDist =  Utility.HDist(specPoints[i], specPoints[i-1]);
-            dists[i - 1] = hDist;
-            totalDist += hDist;
-        }
-
+        float totalDist = GetDist(specPoints, out float[] dists);
         float r = UnityEngine.Random.Range(0f, 1f) * totalDist;
 
         float cumDist = 0;
@@ -196,5 +191,18 @@ public class CrowdPath : Path
         }
         
         return 1;
+    }
+
+    public float GetDist(Vector3[] specPoints, out float[] dists) {
+        dists = new float[specPoints.Length - 1];
+        float totalDist = 0;
+
+        for(int i = 1; i < specPoints.Length; i++) {
+            float hDist =  Utility.HDist(specPoints[i], specPoints[i-1]);
+            dists[i - 1] = hDist;
+            totalDist += hDist;
+        }
+
+        return totalDist;
     }
 }

@@ -21,6 +21,11 @@ public class Path : MonoBehaviour
 
     [Tooltip("Offset from the line along the axis")] public Vector2 randPos = new Vector2(0.3f, 0.3f);
 
+    [Tooltip("The distances between waypoints when you press the auto fill button")] public float autoFillDistance = 3f;
+
+    [Tooltip("Kill the human when it reaches the start")] public bool killAtStart = true;
+    [Tooltip("Kill the human when it reaches the end")] public bool killAtEnd = true;
+
     
     [HideInInspector] public float lineSpacing = 0.6f;
     [HideInInspector] public List<GameObject> waypoints = new List<GameObject>();
@@ -63,9 +68,43 @@ public class Path : MonoBehaviour
         }
     }
 
+
+    // Automatically fill the waypoints to increase waypoint density
+    public void AutoFillWps() {
+        Transform t = transform.Find("points");
+        List<GameObject> childs = new List<GameObject>();
+        for (int i = 0; i < t.childCount; i++) {
+            childs.Add(t.GetChild(i).gameObject);
+        }
+
+        for(int i = 0; i < childs.Count- 1; i++) {
+            GameObject wp1 = childs[i];
+            GameObject wp2 = childs[i + 1];
+            int actualIdx = wp2.transform.GetSiblingIndex();
+            AutoFillWpSingle(wp1, wp2, actualIdx);
+        }
+
+        UpdatePointSet();
+    }
+
+    // Fills the waypoints between two consecutive waypoints
+    private void AutoFillWpSingle(GameObject wp1, GameObject wp2, int idx2) {
+        float hDist = Utility.HDist(wp1.transform.position, wp2.transform.position);
+
+        for (int numToFill = (int)(hDist / autoFillDistance); numToFill > 0; numToFill--) {
+            Vector3 direction = wp2.transform.position - wp1.transform.position;
+            Vector3 newPos = wp1.transform.position + direction.normalized * autoFillDistance * numToFill;
+            GameObject newWp = Instantiate(wp1, newPos, Quaternion.identity) as GameObject;
+            newWp.name = "p" + idx2.ToString() + " (" + numToFill.ToString() + ")";
+            newWp.transform.parent = wp1.transform.parent;
+            newWp.transform.SetSiblingIndex(idx2);
+        }
+    }
+
     // Start is called once at start. If you want to implement a custom start method please call this base method
     public virtual void Start() {
         CrowdManager.Instance.RegisterPath(this);
+        Populate();
     }
 
 #if UNITY_EDITOR

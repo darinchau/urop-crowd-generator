@@ -4,33 +4,6 @@ using System.Collections;
 using System.Collections.Generic;
 
 [System.Serializable]
-public struct CrowdInfo {
-    // Runtime constants (more or less)
-    public float speed;
-    public bool run;
-    public float xFinish;
-    public float zFinish;
-    public string animationName;
-
-    // Total number of waypoints
-    public Vector3[] specPoints;
-
-    // Runtime variables
-    public int currentTargetIdx;
-
-    // Information about the path
-    public bool back;
-    public Path path;
-    public int pathIdx;
-
-    // Check the diverge. Rejected is the previously rejected waypoints so we do not recalculate it on every frame
-    // Divergable is like the frame count. If divergable == 0 then we can diverge
-    // We need to update the specifiedPoints, currentTargetIdx, back, path shall we diverge
-    public float divergable;
-    public List<GameObject> rejected;
-}
-
-[System.Serializable]
 public class Crowd : MonoBehaviour {
 
     // Holds the movement info of the crowd
@@ -91,8 +64,13 @@ public class Crowd : MonoBehaviour {
         // If close enough to the finish, but the finish is not the last point
         //      Update the target first
         // Get the target direction vector
-        // If there is something directly in front, then probe the environment and attempt to go around whatever that is, and recalculate the target direction vector
         // Move according to the target
+
+        bool diverged = cm.CheckDiverge(transform.position, ref info, false);
+
+        if (diverged) {
+            Debug.Log("Diverged in path");
+        }
 
         // Check divergence, and update base finish pos to specifiedPoints[currentTargetIdx]
         Vector3 baseFinishPos = info.specPoints[info.currentTargetIdx];
@@ -121,7 +99,7 @@ public class Crowd : MonoBehaviour {
             info.currentTargetIdx = nextIdx;
         }
         else if (hDist < info.speed * cm.closeEnoughFinalDistance && !hasNextWaypoint) {
-            CycleOfLife(info.pathIdx);
+            CycleOfLife();
             return;
         }
 
@@ -139,10 +117,19 @@ public class Crowd : MonoBehaviour {
     }
 
     // Like a lotus, it opens or closes, dies and is born again. Such is the cycle of life :)
-    public void CycleOfLife(int pathIdx) {
+    public void CycleOfLife() {
         // Close enough to final waypoint. Time to kill
         // GG na
+        // Debug.Log("Such is the story of sun and moon, me and you, and everything else.");
+        bool shouldKill = (info.back && info.path.killAtStart) || (!info.back && info.path.killAtEnd);
+
+        if (!shouldKill) {
+            bool diverged = cm.CheckDiverge(transform.position, ref info, true);
+            if (diverged) return;
+        }
+
         info.path.SpawnPerson(info.pathIdx, true);
         Destroy(gameObject);
+
     }
 }

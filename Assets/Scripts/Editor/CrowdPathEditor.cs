@@ -16,10 +16,10 @@ public class CrowdPathEditor : Editor
 
         GUI.backgroundColor = Color.green;
 
-        if (GUILayout.Button("Populate"))
-        {
-            path.Populate();
-        }
+        // if (GUILayout.Button("Populate"))
+        // {
+        //     path.Populate();
+        // }
 
         EditorGUILayout.Space();
 
@@ -32,10 +32,18 @@ public class CrowdPathEditor : Editor
 
         EditorGUILayout.Space();
 
-        if (GUILayout.Button("Destroy Humans"))
+        if (GUILayout.Button("Auto fill Waypoints"))
         {
-            path.KillAllHumans();
+            path.AutoFillWps();
         }
 
+        EditorGUILayout.Space();
+
+    //     GUI.backgroundColor = Color.red;
+
+    //     if (GUILayout.Button("Destroy Humans"))
+    //     {
+    //         path.KillAllHumans();
+    //     }
     }
 }
