@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -24,35 +25,47 @@ public struct CrowdInfo {
 
     // Check the diverge. Rejected is the previously rejected waypoints so we do not recalculate it on every frame
     // Divergable is like the frame count. If divergable == 0 then we can diverge
+    // We need to update the specifiedPoints, currentTargetIdx, back, path shall we diverge
     public float divergable;
     public List<GameObject> rejected;
-
-    // We need to update the specifiedPoints, currentTargetIdx, back, path shall we diverge
 }
 
 [System.Serializable]
 public class Crowd : MonoBehaviour {
+
+    // Holds the movement info of the crowd
     [SerializeField] CrowdInfo info;
     CrowdManager cm;
 
     public void InitializePerson(int pathIdx, int nextWpIndex, bool run, bool back, float speed, Path path, Vector2 finishPos, Vector3[] specPoints) {
         // Make a new crowd info
         info = new CrowdInfo();
-        info.speed = speed;
+        info.pathIdx = pathIdx;
+        info.currentTargetIdx = nextWpIndex;
         info.run = run;
         info.back = back;
+        info.speed = speed;
+
+        // The path of the crowd human
         info.path = path;
-        info.pathIdx = pathIdx;
         info.xFinish = finishPos.x;
         info.zFinish = finishPos.y;
 
-        // Initialize some additional variables for our convenience
+        // The base waypoints of the path
         info.specPoints = specPoints;
-        info.currentTargetIdx = nextWpIndex;
+        
+        // Animator info
         info.animationName = run ? "run" : "walk";
 
-        info.divergable = 0f;
+        // Diverge. Wait 5 seconds before first diverge is available
+        info.divergable = 5f;
         info.rejected = new List<GameObject>();
+
+        // Add the nav mesh agent component
+        NavMeshAgent n = Utility.GetOrAddComponent<NavMeshAgent>(gameObject);
+        n.speed = speed;
+        n.radius = 0.3f;
+        n.height = 1.85f;
     }
 
     // Start is called once in the beginning. Initialize the animation controller at the start.
@@ -68,6 +81,8 @@ public class Crowd : MonoBehaviour {
     // TODO add probing. If too close to other humans and/or game objects (like trees or traffic light), then do something about it.
     void Update ()
     {   
+        NavMeshAgent n = GetComponent<NavMeshAgent>();
+
         // Set base finish position, handle slopes and calculate target
         // Check diverge
         // Calculate current distance (horizontal) to target
@@ -80,7 +95,7 @@ public class Crowd : MonoBehaviour {
         // Move according to the target
 
         // Check divergence, and update base finish pos to specifiedPoints[currentTargetIdx]
-        Vector3 baseFinishPos = cm.Diverge(transform.position, ref info.pathIdx, ref info.specPoints, ref info.currentTargetIdx, ref info.back, ref info.path, ref info.rejected, ref info.divergable);
+        Vector3 baseFinishPos = info.specPoints[info.currentTargetIdx];
 
         // Perform raycast to handle slopes
         RaycastHit hit;
@@ -92,50 +107,42 @@ public class Crowd : MonoBehaviour {
             transform.position = new Vector3(transform.position.x, hit.point.y, transform.position.z);
         }
         
-        // Set the target position as transform position and randomized finish position
-        // Chop the y component
-        Vector3 finishPos = new Vector3(baseFinishPos.x + info.xFinish, baseFinishPos.y, baseFinishPos.z + info.zFinish);
-        Vector3 targetPos = new Vector3(finishPos.x, transform.position.y, finishPos.z);
+        Vector3 targetPos = GetTargetPos(baseFinishPos, info.xFinish, info.zFinish);
 
         // Calculate the horizontal straight line distance between the current position and the finish position
-        float hDist = CrowdManager.HDist(transform.position, finishPos);
+        float hDist = Utility.HDist(transform.position, targetPos);
         
         // If close enough to the next waypoint then we perform some additional updates on waypoints
         bool hasNextWaypoint = (!info.back && info.currentTargetIdx < info.path.waypoints.Count) || (info.back && info.currentTargetIdx > 0);
 
         if (hDist < info.speed * cm.closeEnoughDistance && hasNextWaypoint) {
             int nextIdx = info.back ? info.currentTargetIdx - 1 : info.currentTargetIdx + 1;
-            targetPos = info.specPoints[nextIdx];
-            targetPos.y = transform.position.y;
+            targetPos = targetPos = GetTargetPos(info.specPoints[nextIdx], info.xFinish, info.zFinish);
             info.currentTargetIdx = nextIdx;
         }
         else if (hDist < info.speed * cm.closeEnoughFinalDistance && !hasNextWaypoint) {
-            // Close enough to final waypoint. Time to kill
-            // GG na
-            info.path.SpawnPerson(info.pathIdx, true);
-            Destroy(gameObject);
+            CycleOfLife(info.pathIdx);
+            return;
         }
 
-        // Move towards the target
-        Vector3 targetVector = targetPos - transform.position;
-        // Avoid rubberbanding if the next waypoint is super far away
-        targetVector.Normalize();
+        n.SetDestination(targetPos);
+    }
 
-        // TODO Perform probing here
 
-        // This just makes sure there is no divide by zero error in runtime. Practically this always runs.
-        // Update the look direction of humans
-        if(targetVector != Vector3.zero)
-        {
-            Vector3 newDir = Vector3.zero;
-            newDir = Vector3.RotateTowards(transform.forward, targetVector, cm.rotationSpeed * info.speed * Time.deltaTime, 0.0f);
-            transform.rotation = Quaternion.LookRotation(newDir);
-        }
+    // Get the target vector
+    public Vector3 GetTargetPos(Vector3 baseFinishPos, float xFinish, float zFinish) {
+        // Set the target position as transform position and randomized finish position
+        // Chop the y component
+        Vector3 finishPos = new Vector3(baseFinishPos.x + info.xFinish, baseFinishPos.y, baseFinishPos.z + info.zFinish);
+        Vector3 targetPos = new Vector3(finishPos.x, transform.position.y, finishPos.z);
+        return targetPos;
+    }
 
-        Debug.DrawRay(transform.position, transform.forward);
-
-        // Move the human a bit forward taking into consideration its rotation
-        float magnitude = Time.deltaTime * 1.0f * info.speed;
-        transform.position += targetVector * magnitude;
+    // Like a lotus, it opens or closes, dies and is born again. Such is the cycle of life :)
+    public void CycleOfLife(int pathIdx) {
+        // Close enough to final waypoint. Time to kill
+        // GG na
+        info.path.SpawnPerson(info.pathIdx, true);
+        Destroy(gameObject);
     }
 }

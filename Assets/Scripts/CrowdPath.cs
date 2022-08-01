@@ -13,9 +13,7 @@ public class CrowdPath : Path
     [Tooltip("Speed of runing will be generated UnityEngine.Randomly with normal distribution - X: mean, Y: variance")] [SerializeField] private Vector2 runSpeed = new Vector2(4f, 0.6f);
     [Tooltip("Maximum deviation from normal speed")] [SerializeField] private float maxSigma = 3f;
 
-    [Tooltip("Add a bit of UnityEngine.Randomness to the finishing position")] [SerializeField] private Vector2 randFinish = new Vector2(0.1f, 0.1f);
-
-    public override Vector3[,] RecalculatePoint() {
+    public override void RecalculatePoint() {
         if (pathWidth < 1) pathWidth = 1;
         if (lineSpacing < 0.6f) lineSpacing = 0.6f;
 
@@ -23,14 +21,19 @@ public class CrowdPath : Path
         if (loopPath) waypoints.Add(waypoints[0]);
         int n = waypoints.Count;
 
-        // If there is no waypoints
-        if (n < 2) return base.RecalculatePoint();
+        // If there is not enough waypoints
+        if (n < 2) return;
 
         // Now assign length to the points 2D array
         // First index is vertically, second index is horizontally
-        Vector3[,] points = new Vector3[pathWidth, n + 2];
+        points = new List<Vector3[]>();
 
-        // Create a vector from one waypoint to the next to draw the gizmos
+        // First fix the list
+        for (int i = 0; i < pathWidth; i++) {
+            points.Add(new Vector3[n + 2]);
+        }
+
+        // Create a vector from one waypoint to the next
         for (int i = 0; i < n; i++)
         {
             Vector3 vectorStart;
@@ -58,25 +61,28 @@ public class CrowdPath : Path
             Vector3 shear = Vector3.Normalize((Quaternion.Euler(0, 90, 0) * (vectorStart + vectorEnd)));
 
             // Assign the first vertical waypoint, if there is more than one waypoint then assign the rest
-            // Use the scale x to determine an additional shear factor
+            // Use the transform scale x to determine an additional shear factor
             float shearFactor = waypoints[i].transform.localScale.x;
-            points[0, i + 1] = pathWidth % 2 == 1 ? waypoints[i].transform.position : waypoints[i].transform.position + shear * (lineSpacing * shearFactor / 2);
-            if (pathWidth > 1) points[1, i + 1] = points[0, i + 1] - shear * lineSpacing * shearFactor;
+
+            // Handle differently if there is even number of paths vs if there is odd number paths
+            points[0][i + 1] = pathWidth % 2 == 1 ? waypoints[i].transform.position : waypoints[i].transform.position + shear * (lineSpacing * shearFactor / 2);
+
+            // Update the first one too
+            if (pathWidth > 1) 
+                points[1][i + 1] = points[0][i + 1] - shear * lineSpacing * shearFactor;
 
             for (int w = 1; w < pathWidth; w++)
             {
-                points[w, i + 1] = points[0, i + 1] + shear * lineSpacing * shearFactor * (float) (Math.Pow(-1, w)) * ((w + 1) / 2);
+                points[w][i + 1] = points[0][i + 1] + shear * lineSpacing * shearFactor * (float) (Math.Pow(-1, w)) * ((w + 1) / 2);
             }
         }
 
         // Duplicate the first and last waypoints for every path
         for (int w = 0; w < pathWidth; w++)
         {
-            points[w, 0] = points[w, 1];
-            points[w, n + 1] = points[w, n];
+            points[w][0] = points[w][1];
+            points[w][n + 1] = points[w][n];
         }
-
-        return points;
     }
 
 
@@ -86,13 +92,13 @@ public class CrowdPath : Path
         int n = waypoints.Count;
         if (n < 2) return;
 
-        Vector3[,] points = RecalculatePoint();
+        RecalculatePoint();
 
         // Now we actually draw the Gizmos
         Gizmos.color = Color.green;
         for (int w = 0; w < pathWidth; w++)
         {
-            for (int i = 1; i < n; i++) Gizmos.DrawLine(points[w, i + 1], points[w, i]);
+            for (int i = 1; i < n; i++) Gizmos.DrawLine(points[w][i + 1], points[w][i]);
         }
     }
     
@@ -100,7 +106,7 @@ public class CrowdPath : Path
     public override void SpawnPerson(int pathIdx, bool startAtBeginning)
     {
         // This recalculates the waypoints
-        Vector3[,] points = RecalculatePoint();
+        RecalculatePoint();
         int n = waypoints.Count;
 
         // Randomly generate the profile of the human
@@ -111,14 +117,15 @@ public class CrowdPath : Path
         
         int appearanceIdx = UnityEngine.Random.Range(0, people.Length);
 
-        Vector2 randFinishPos = new Vector2(UnityEngine.Random.Range(-randFinish.x, randFinish.x), UnityEngine.Random.Range(-randFinish.y, randFinish.y));
+        Vector2 randFinishPos = new Vector2(UnityEngine.Random.Range(-randPos.x, randPos.x), UnityEngine.Random.Range(-randPos.y, randPos.y));
 
         // Make a vector 3 array to hold the pathIdx specified information of waypoints
-        Vector3[] specPoints = GetSpecPoints(pathIdx);
+        Vector3[] specPoints = points[pathIdx];
         
         // Create the person somewhere between the given wpindex and the previous one. If the given is 1 or given is n then since 0-1, and n-n+1 are duplicates anyway so there is nothing in betweens
         int prevWpIndex, nextWpIndex;
-
+        
+        // Now the reason why we double the end points is clear - if we want someone to start at the beginning we spawn it between point 0 and 1, so by squeeze theorem the point is fixed.
         if (back) 
         {
             prevWpIndex = startAtBeginning ? n + 1 : GenerateEvenNextWpIdx(specPoints);
@@ -171,11 +178,11 @@ public class CrowdPath : Path
     }
 
     public int GenerateEvenNextWpIdx(Vector3[] specPoints) {
-        float[] dists = new float[waypoints.Count - 1];
+        float[] dists = new float[specPoints.Length - 1];
         float totalDist = 0;
 
-        for(int i = 1; i < waypoints.Count; i++) {
-            float hDist =  CrowdManager.HDist(specPoints[i], specPoints[i-1]);
+        for(int i = 1; i < specPoints.Length; i++) {
+            float hDist =  Utility.HDist(specPoints[i], specPoints[i-1]);
             dists[i - 1] = hDist;
             totalDist += hDist;
         }
@@ -183,21 +190,11 @@ public class CrowdPath : Path
         float r = UnityEngine.Random.Range(0f, 1f) * totalDist;
 
         float cumDist = 0;
-        for(int i = 1; i < waypoints.Count; i++) {
+        for(int i = 1; i < specPoints.Length; i++) {
             cumDist += dists[i-1];
             if (r <= cumDist) {return i; }
         }
         
         return 1;
-    }
-
-    public override Vector3[] GetSpecPoints(int pathIdx) {
-        Vector3[,] points = RecalculatePoint();
-        int n = waypoints.Count;
-        Vector3[] specPoints = new Vector3[n + 2];
-        for (int i = 0; i < n + 2; i++) {
-            specPoints[i] = points[pathIdx, i];
-        }
-        return specPoints;
     }
 }
