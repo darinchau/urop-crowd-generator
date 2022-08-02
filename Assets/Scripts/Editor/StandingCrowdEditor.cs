@@ -4,7 +4,7 @@ using UnityEngine;
 using System.IO;
 
 [CustomEditor(typeof(StandingCrowdPath))]
-public class StndingCrowdEditor : Editor
+public class StandingCrowdEditor : Editor
 {
     public override void OnInspectorGUI()
     {
@@ -16,12 +16,12 @@ public class StndingCrowdEditor : Editor
 
         EditorGUILayout.Space();
 
-        GUI.backgroundColor = Color.green;
+        // GUI.backgroundColor = Color.green;
 
-        if (GUILayout.Button("Populate"))
-        {
-            path.Populate();
-        }
+        // if (GUILayout.Button("Populate"))
+        // {
+        //     path.Populate();
+        // }
 
         EditorGUILayout.Space();
 
@@ -39,13 +39,13 @@ public class StndingCrowdEditor : Editor
             path.AutoFillWps();
         }
 
-        EditorGUILayout.Space();
+        // EditorGUILayout.Space();
 
-        GUI.backgroundColor = Color.red;
+        // GUI.backgroundColor = Color.red;
 
-        if (GUILayout.Button("Destroy Humans"))
-        {
-            path.KillAllHumans();
-        }
+        // if (GUILayout.Button("Destroy Humans"))
+        // {
+        //     path.KillAllHumans();
+        // }
     }
 }

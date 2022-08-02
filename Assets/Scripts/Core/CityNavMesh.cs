@@ -4,6 +4,8 @@ using UnityEngine;
 
 public class CityNavMesh : MonoBehaviour
 {
+
+    // This makes everything with a mesh renderer child under the object to be navigation static. Useful to put on the root object of the city
     public void UpdateNavMesh() {
         MeshRenderer[] meshes = gameObject.GetComponentsInChildren<MeshRenderer>();
         for(int i = 0; i < meshes.Length; i++) {
@@ -12,4 +14,6 @@ public class CityNavMesh : MonoBehaviour
             g.isStatic = true;
         }
     }
+
+    // This makes
 }

@@ -108,20 +108,25 @@ public class StandingCrowdPath : Path
             }
 
             // TODO use a better indexing method
+            int adds = 0;
             List<Vector3> polygon1 = new List<Vector3>();
             for (int i = xIdx;; i++) {
+                adds += 1;
                 if (i == n) i = 0;
                 polygon1.Add(vertices[i]);
 
                 if (i == vIdx) break;
+                if (adds >= n + 2) throw new System.Exception();
             }
 
             List<Vector3> polygon2 = new List<Vector3>();
             for (int i = vIdx;; i++) {
+                adds += 1;
                 if (i == n) i = 0;
                 polygon2.Add(vertices[i]);
 
                 if (i == xIdx) break;
+                if (adds >= n + 2) throw new System.Exception();
             }
 
             List<Vector3[]> tri1 = TriangulateRecursive(polygon1);
@@ -268,14 +273,43 @@ public class StandingCrowdPath : Path
 
             string animName = animations[UnityEngine.Random.Range(0,animations.Length)];
 
-            crowd.InitializePerson(pathIdx, animName, this);
+            // Make a new crowdinfo
+            CrowdInfo info = new CrowdInfo();
+            info.pathIdx = pathIdx;
+            info.animationName = animName;
+            info.path = this;
+            info.speed = 5f;
+            info.spawnPos = spawnPoints[i];
+
+            crowd.InitializePerson(info);
         }
     }
 
     public override void Populate()
     {
-        Spawn(0, false);
+        // This time density means each 10 unit area has such number of clumps
+        int n = waypoints.Count;
+        RecalculatePoint();
+
+        float[] _areas = new float[n - 2];
+        float totalArea = 0f;
+
+        for (int i = 0; i < n - 2; i++) {
+            _areas[i] = Area(points[i][0], points[i][1], points[i][2]);
+            totalArea += _areas[i];
+        }
+
+        int clump = (int)(density * totalArea / 5f);
+
+        for (int i = 0; i < clump; i++) {
+            Spawn(i, false);
+        }
     }
+
+    // Start is called once at start. If you want to implement a custom start method please call this base method
+    // public override void Start() {
+    //     base.Start();
+    // }
 
     private float Area(Vector3 x, Vector3 y, Vector3 z) {
         float a = Utility.HDist(y, z);

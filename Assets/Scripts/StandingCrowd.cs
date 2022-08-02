@@ -4,33 +4,34 @@ using UnityEngine;
 using UnityEngine.AI;
 
 [System.Serializable]
-public class StandingCrowd : MonoBehaviour
+public class StandingCrowd : Crowd
 {
-    // Holds the movement info of the crowd
-    [SerializeField] CrowdInfo info;
-    CrowdManager cm;
-
-    public void InitializePerson(int pathIdx, string animName, Path p) {
-        info = new CrowdInfo();
-        info.pathIdx = pathIdx;
-        info.animationName = animName;
-        info.path = p;
-
-        // Add the nav mesh agent component
-        NavMeshAgent n = Utility.GetOrAddComponent<NavMeshAgent>(gameObject);
-        n.speed = 5f;
-        n.radius = 0.3f;
-        n.height = 1.85f;
-    }
+    private float countdown = 5f;
 
     // Start is called once in the beginning. Initialize the animation controller at the start.
-    void Start()
+    public override void Start()
     {
+        base.Start();
         Animator animator = GetComponent<Animator>();
-        animator.Play(info.animationName);
-        cm = CrowdManager.Instance;
-        NavMeshAgent n = GetComponent<NavMeshAgent>();
+        animator.Play(info.animationName, -1, UnityEngine.Random.Range(0f, 1f));
     }
 
-    
+    int destroyed = 0;
+
+    public override void Update() {
+        if (countdown > 0) {
+            NavMeshAgent n = GetComponent<NavMeshAgent>();
+            n.SetDestination(info.spawnPos);
+            countdown -= Time.deltaTime;
+        }
+        else if (destroyed == 0) {
+            NavMeshAgent n = GetComponent<NavMeshAgent>();
+            Destroy(n);
+            destroyed = 1;
+        }
+        else if (destroyed == 1) {
+            SetNavMesh();
+            destroyed = 2;
+        }
+    }
 }

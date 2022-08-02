@@ -111,9 +111,7 @@ public class Path : MonoBehaviour
         }
     }
 
-    // Start is called once at start. If you want to implement a custom start method please call this base method
     public virtual void Start() {
-        CrowdManager.Instance.RegisterPath(this);
         Populate();
     }
 

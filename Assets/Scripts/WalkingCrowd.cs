@@ -4,55 +4,22 @@ using System.Collections;
 using System.Collections.Generic;
 
 [System.Serializable]
-public class WalkingCrowd : MonoBehaviour {
-
-    // Holds the movement info of the crowd
-    [SerializeField] CrowdInfo info;
-    CrowdManager cm;
-
-    public void InitializePerson(int pathIdx, int nextWpIndex, bool run, bool back, float speed, string animName, Path path, Vector2 finishPos, Vector3[] specPoints) {
-        // Make a new crowd info
-        info = new CrowdInfo();
-        info.pathIdx = pathIdx;
-        info.currentTargetIdx = nextWpIndex;
-        info.run = run;
-        info.back = back;
-        info.speed = speed;
-
-        // The path of the crowd human
-        info.path = path;
-        info.xFinish = finishPos.x;
-        info.zFinish = finishPos.y;
-
-        // The base waypoints of the path
-        info.specPoints = specPoints;
-        
-        // Animator info
-        info.animationName = animName;
-
-        // Diverge. Add a bit of randomness to this so not everyone calls the diverge checks simultaneously later on
-        info.divergable = UnityEngine.Random.Range(4.6f, 5.4f);
-        info.rejected = new List<GameObject>();
-
-        // Add the nav mesh agent component
-        NavMeshAgent n = Utility.GetOrAddComponent<NavMeshAgent>(gameObject);
-        n.speed = speed;
-        n.radius = 0.3f;
-        n.height = 1.85f;
-    }
-
+public class WalkingCrowd : Crowd
+{
     // Start is called once in the beginning. Initialize the animation controller at the start.
-    void Start()
+    public override void Start()
     {
+        base.Start();
         Animator animator = GetComponent<Animator>();
         animator.CrossFade(info.animationName, 0.1f, 0, Random.Range(0.0f, 1.0f));
         animator.speed = info.run ? info.speed / 3f : info.speed * 1.2f;
-        cm = CrowdManager.Instance;
     }
 
     // Update is called once every frame. This updates the position of humans
-    void Update ()
+    public override void Update ()
     {   
+        base.Update();
+
         NavMeshAgent n = GetComponent<NavMeshAgent>();
 
         // Set base finish position, handle slopes and calculate target

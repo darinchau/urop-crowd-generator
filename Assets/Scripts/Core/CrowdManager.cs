@@ -14,6 +14,8 @@ public struct CrowdInfo {
     // Total number of waypoints
     public Vector3[] specPoints;
 
+    public Vector3 spawnPos;
+
     // Runtime variables
     public int currentTargetIdx;
 

@@ -167,7 +167,32 @@ public class WalkingCrowdPath : Path
 
         string animName = run ? "run" : "walk";
 
-        crowd.InitializePerson(pathIdx, nextWpIndex, run, back, speed, animName, this, randFinishPos, specPoints);
+        // Make a new crowd info
+        CrowdInfo info = new CrowdInfo();
+        info.pathIdx = pathIdx;
+        info.currentTargetIdx = nextWpIndex;
+        info.run = run;
+        info.back = back;
+        info.speed = speed;
+
+        // The path of the crowd human
+        info.path = this;
+        info.xFinish = randFinishPos.x;
+        info.zFinish = randFinishPos.y;
+
+        // The base waypoints of the path
+        info.specPoints = specPoints;
+        
+        // Animator info
+        info.animationName = animName;
+
+        // Diverge. Add a bit of randomness to this so not everyone calls the diverge checks simultaneously later on
+        info.divergable = UnityEngine.Random.Range(4.6f, 5.4f);
+        info.rejected = new List<GameObject>();
+
+        info.spawnPos = spawnPos;
+
+        crowd.InitializePerson(info);
     }
 
     // TODO use inverse transform sampling to make people more evenly distributed
@@ -224,5 +249,11 @@ public class WalkingCrowdPath : Path
         }
 
         return totalDist;
+    }
+
+    // Start is called once at start. If you want to implement a custom start method please call this base method
+    public override void Start() {
+        base.Start();
+        CrowdManager.Instance.RegisterPath((Path)this);
     }
 }
