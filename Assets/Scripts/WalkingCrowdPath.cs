@@ -1,10 +1,11 @@
 using System;
 using UnityEngine;
+using UnityEngine.AI;
 using System.Collections.Generic;
 using System.Collections;
 
 // A people spawner whose purpose in life is to let us set a bunch of parameters and spawn a bunch of people
-public class CrowdPath : Path
+public class WalkingCrowdPath : Path
 {   
     [Tooltip("Proportion of people running"), Range(0,1)] public float runningProportion = 0.01f;
     [Tooltip("Proportion of people walking/running backwards"), Range(0,1)] public float backProportion = 0.08f;
@@ -15,7 +16,7 @@ public class CrowdPath : Path
 
     public override void RecalculatePoint() {
         if (pathWidth < 1) pathWidth = 1;
-        if (lineSpacing < 0.6f) lineSpacing = 0.6f;
+        if (spacing < 0.6f) spacing = 0.6f;
 
         // Number of waypoints. First add the first waypoint to th list if we should loop the path
         if (loopPath) waypoints.Add(waypoints[0]);
@@ -65,15 +66,15 @@ public class CrowdPath : Path
             float shearFactor = waypoints[i].transform.localScale.x;
 
             // Handle differently if there is even number of paths vs if there is odd number paths
-            points[0][i + 1] = pathWidth % 2 == 1 ? waypoints[i].transform.position : waypoints[i].transform.position + shear * (lineSpacing * shearFactor / 2);
+            points[0][i + 1] = pathWidth % 2 == 1 ? waypoints[i].transform.position : waypoints[i].transform.position + shear * (spacing * shearFactor / 2);
 
             // Update the first one too
             if (pathWidth > 1) 
-                points[1][i + 1] = points[0][i + 1] - shear * lineSpacing * shearFactor;
+                points[1][i + 1] = points[0][i + 1] - shear * spacing * shearFactor;
 
             for (int w = 1; w < pathWidth; w++)
             {
-                points[w][i + 1] = points[0][i + 1] + shear * lineSpacing * shearFactor * (float) (Math.Pow(-1, w)) * ((w + 1) / 2);
+                points[w][i + 1] = points[0][i + 1] + shear * spacing * shearFactor * (float) (Math.Pow(-1, w)) * ((w + 1) / 2);
             }
         }
 
@@ -102,8 +103,10 @@ public class CrowdPath : Path
         }
     }
     
-    // Spawn one person on the specified path. 
-    public override void SpawnPerson(int pathIdx, bool startAtBeginning)
+    // Spawn one person on the specified path.
+    // Path Idx is index of the path the person is on
+    // runtime indicates whether th function is called at runtime or in the beginning
+    public override void Spawn(int pathIdx, bool runtime)
     {
         // This recalculates the waypoints
         RecalculatePoint();
@@ -111,7 +114,22 @@ public class CrowdPath : Path
 
         // Randomly generate the profile of the human
         bool run = UnityEngine.Random.value <= runningProportion;
-        bool back = UnityEngine.Random.value <= backProportion;
+        bool back;
+
+        // If dont kill at end then don't spawn at end either
+        if (runtime && !killAtEnd && killAtStart) {
+            back = false;
+        }
+        else if (runtime && !killAtStart && killAtEnd) {
+            back = true;
+        }
+        else if (runtime && !killAtStart && !killAtEnd) { 
+            Debug.Log("Making spawn call on a pacifist path!");
+            back = UnityEngine.Random.value <= backProportion;
+        } 
+        else {
+            back = UnityEngine.Random.value <= backProportion;
+        }
 
         float speed = run ? GenerateNormal(runSpeed.x, runSpeed.y, maxSigma) : GenerateNormal(walkSpeed.x, walkSpeed.y, maxSigma);
         
@@ -128,12 +146,12 @@ public class CrowdPath : Path
         // Now the reason why we double the end points is clear - if we want someone to start at the beginning we spawn it between point 0 and 1, so by squeeze theorem the point is fixed.
         if (back) 
         {
-            prevWpIndex = startAtBeginning ? n + 1 : GenerateEvenNextWpIdx(specPoints);
+            prevWpIndex = runtime ? n + 1 : GenerateEvenNextWpIdx(specPoints);
             nextWpIndex = prevWpIndex - 1;
         }
         else 
         {
-            nextWpIndex = startAtBeginning ? 1 : GenerateEvenNextWpIdx(specPoints);
+            nextWpIndex = runtime ? 1 : GenerateEvenNextWpIdx(specPoints);
             prevWpIndex = nextWpIndex - 1;
         }
 
@@ -145,9 +163,11 @@ public class CrowdPath : Path
 
         GameObject person = Instantiate(people[appearanceIdx], spawnPos, Quaternion.identity) as GameObject;
         person.transform.parent = personParent;
-        Crowd crowd = person.AddComponent<Crowd>();
+        WalkingCrowd crowd = person.AddComponent<WalkingCrowd>();
 
-        crowd.InitializePerson(pathIdx, nextWpIndex, run, back, speed, this, randFinishPos, specPoints);
+        string animName = run ? "run" : "walk";
+
+        crowd.InitializePerson(pathIdx, nextWpIndex, run, back, speed, animName, this, randFinishPos, specPoints);
     }
 
     // TODO use inverse transform sampling to make people more evenly distributed
@@ -160,7 +180,7 @@ public class CrowdPath : Path
 
         for (int i = 0; i < numPerson; i++) {
             int pathIdx = UnityEngine.Random.Range(0, pathWidth);
-            SpawnPerson(pathIdx, false);
+            Spawn(pathIdx, false);
         }
     }
 

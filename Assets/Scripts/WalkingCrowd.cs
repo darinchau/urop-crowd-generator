@@ -4,13 +4,13 @@ using System.Collections;
 using System.Collections.Generic;
 
 [System.Serializable]
-public class Crowd : MonoBehaviour {
+public class WalkingCrowd : MonoBehaviour {
 
     // Holds the movement info of the crowd
     [SerializeField] CrowdInfo info;
     CrowdManager cm;
 
-    public void InitializePerson(int pathIdx, int nextWpIndex, bool run, bool back, float speed, Path path, Vector2 finishPos, Vector3[] specPoints) {
+    public void InitializePerson(int pathIdx, int nextWpIndex, bool run, bool back, float speed, string animName, Path path, Vector2 finishPos, Vector3[] specPoints) {
         // Make a new crowd info
         info = new CrowdInfo();
         info.pathIdx = pathIdx;
@@ -28,10 +28,10 @@ public class Crowd : MonoBehaviour {
         info.specPoints = specPoints;
         
         // Animator info
-        info.animationName = run ? "run" : "walk";
+        info.animationName = animName;
 
-        // Diverge. Wait 5 seconds before first diverge is available
-        info.divergable = 5f;
+        // Diverge. Add a bit of randomness to this so not everyone calls the diverge checks simultaneously later on
+        info.divergable = UnityEngine.Random.Range(4.6f, 5.4f);
         info.rejected = new List<GameObject>();
 
         // Add the nav mesh agent component
@@ -51,7 +51,6 @@ public class Crowd : MonoBehaviour {
     }
 
     // Update is called once every frame. This updates the position of humans
-    // TODO add probing. If too close to other humans and/or game objects (like trees or traffic light), then do something about it.
     void Update ()
     {   
         NavMeshAgent n = GetComponent<NavMeshAgent>();
@@ -68,9 +67,9 @@ public class Crowd : MonoBehaviour {
 
         bool diverged = cm.CheckDiverge(transform.position, ref info, false);
 
-        if (diverged) {
-            Debug.Log("Diverged in path");
-        }
+        // if (diverged) {
+        //     Debug.Log("Diverged in path");
+        // }
 
         // Check divergence, and update base finish pos to specifiedPoints[currentTargetIdx]
         Vector3 baseFinishPos = info.specPoints[info.currentTargetIdx];
@@ -128,8 +127,7 @@ public class Crowd : MonoBehaviour {
             if (diverged) return;
         }
 
-        info.path.SpawnPerson(info.pathIdx, true);
+        info.path.Spawn(info.pathIdx, true);
         Destroy(gameObject);
-
     }
 }

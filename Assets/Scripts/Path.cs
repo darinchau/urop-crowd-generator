@@ -14,7 +14,6 @@ public class Path : MonoBehaviour
     [Tooltip("Width of the path")] public int pathWidth = 8;
     [Tooltip("Density of people")] [Range(0.01f, 1f)] public float density = 0.2f;
 
-    [Tooltip("Distance between people")][Range(0.3f, 1.5f)] public float socialDistance = 0.3f;
     [Tooltip("Make the path closed in the ring")] public bool loopPath;
 
     [Tooltip("The probability that someone stays within a path when it could divert to a new waypoint")] [Range(0f, 1f)]  public float stickyness = 0.6f;
@@ -27,13 +26,13 @@ public class Path : MonoBehaviour
     [Tooltip("Kill the human when it reaches the end")] public bool killAtEnd = true;
 
     
-    [HideInInspector] public float lineSpacing = 0.6f;
+    [HideInInspector] public float spacing = 0.6f;
     [HideInInspector] public List<GameObject> waypoints = new List<GameObject>();
     // Each element in the points list is a path drawn with a green line in the scene view
     [HideInInspector] public List<Vector3[]> points;
 
     // Abstract methods. Spawn person spawns one person. Populate spawns multiple people, Draw curve gizmos draws the curvy gizmos, and Recalculate point recalculates points, returns the number of waypoints
-    public virtual void SpawnPerson(int pathIdx, bool startAtBeginning) { }
+    public virtual void Spawn(int pathIdx, bool runtime) { }
     public virtual void Populate() { }
     public virtual void DrawCurveGizmos() { }
     public virtual void RecalculatePoint() { }
@@ -51,6 +50,8 @@ public class Path : MonoBehaviour
         for(int i = 0; i < count; i++) {
             waypoints.Add(t.GetChild(i).gameObject);
         }
+
+        RenameWps();
     }
 
     // Updates the point set in case something gone wrong
@@ -98,6 +99,15 @@ public class Path : MonoBehaviour
             newWp.name = "p" + idx2.ToString() + " (" + numToFill.ToString() + ")";
             newWp.transform.parent = wp1.transform.parent;
             newWp.transform.SetSiblingIndex(idx2);
+        }
+    }
+
+    private void RenameWps() {
+        Transform t = transform.Find("points");
+        for (int i = 0; i < t.childCount; i++) {
+            GameObject g = t.GetChild(i).gameObject;
+            string name = "p" + i.ToString();
+            g.name = name;
         }
     }
 

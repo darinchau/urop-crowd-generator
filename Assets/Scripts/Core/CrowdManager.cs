@@ -77,8 +77,14 @@ public class CrowdManager : Singleton<CrowdManager>
     }
 
     // returns true if successfully diverged, false otherwise
+    // This is called like 10000 times a second so better to optimze the heck out of it
+    
     public bool CheckDiverge(Vector3 currentPos, ref CrowdInfo info, bool force = false) {
         if (info.divergable <= 0 || force) {
+            // First optimization is to not actually do all the list operations and for loop stuff every frame
+            // Offset it a bit so not everyone calls this function at the same time
+            // Let's not call RNG here either since RNG call can be expensive too
+            info.divergable = 0.5f;
             // Check each waypoint in all the registered waypoints
             for(int i = 0; i < allWaypoints.Count; i++) {
                 // If the waypoint is not in the current path, then calculate the distance and see if it is close enough
@@ -98,10 +104,11 @@ public class CrowdManager : Singleton<CrowdManager>
                 }
 
                 // If the waypoint is on the current path or it is already rejected then continue;
-                if (!force && (isRejected || info.path.waypoints.Contains(wp))) continue;
+                if (!force && isRejected) continue;
+                if (info.path.waypoints.Contains(wp)) continue;
 
                 // Now that it passed all the tests, try to see if the RNG Gods want it to diverge
-                if (!force && UnityEngine.Random.Range(0f, 1f) < Math.Pow(info.path.stickyness, 3)) {
+                if (!force && UnityEngine.Random.Range(0f, 1f) < Mathf.Pow(info.path.stickyness, 0.25f)) {
                     // Whoops RNG gods say no. Reject it
                     info.rejected.Add(wp);
                     continue;

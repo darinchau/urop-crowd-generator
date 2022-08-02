@@ -3,14 +3,14 @@ using UnityEditor;
 using UnityEngine;
 using System.IO;
 
-[CustomEditor(typeof(CrowdPath))]
+[CustomEditor(typeof(WalkingCrowdPath))]
 public class CrowdPathEditor : Editor
 {
     public override void OnInspectorGUI()
     {
         DrawDefaultInspector();
 
-        CrowdPath path = target as CrowdPath;
+        WalkingCrowdPath path = target as WalkingCrowdPath;
 
         EditorGUILayout.Space();
 
