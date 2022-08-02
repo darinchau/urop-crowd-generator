@@ -42,10 +42,8 @@ public class WalkingCrowd : Crowd
         Vector3 baseFinishPos = info.specPoints[info.currentTargetIdx];
 
         // Perform raycast to handle slopes
-        RaycastHit hit;
-
         // Shift character up if raycast hits anything that went into the human feet
-        if(Physics.Raycast(transform.position + new Vector3(0, 2, 0), -transform.up, out hit))
+        if(Physics.Raycast(transform.position + new Vector3(0, 2, 0), -transform.up, out RaycastHit hit))
         {
             baseFinishPos.y = hit.point.y;
             transform.position = new Vector3(transform.position.x, hit.point.y, transform.position.z);
@@ -54,17 +52,18 @@ public class WalkingCrowd : Crowd
         Vector3 targetPos = GetTargetPos(baseFinishPos, info.xFinish, info.zFinish);
 
         // Calculate the horizontal straight line distance between the current position and the finish position
-        float hDist = Utility.HDist(transform.position, targetPos);
+        // float hDist = Utility.HDist(transform.position, targetPos);
+        float hDist = (transform.position - targetPos).magnitude;
         
         // If close enough to the next waypoint then we perform some additional updates on waypoints
         bool hasNextWaypoint = (!info.back && info.currentTargetIdx < info.path.waypoints.Count) || (info.back && info.currentTargetIdx > 0);
 
-        if (hDist < info.speed * cm.closeEnoughDistance && hasNextWaypoint) {
+        if (hDist < info.speed * closeEnoughDistance && hasNextWaypoint) {
             int nextIdx = info.back ? info.currentTargetIdx - 1 : info.currentTargetIdx + 1;
-            targetPos = targetPos = GetTargetPos(info.specPoints[nextIdx], info.xFinish, info.zFinish);
+            targetPos = GetTargetPos(info.specPoints[nextIdx], info.xFinish, info.zFinish);
             info.currentTargetIdx = nextIdx;
         }
-        else if (hDist < info.speed * cm.closeEnoughFinalDistance && !hasNextWaypoint) {
+        else if (hDist < info.speed * closeEnoughFinalDistance && !hasNextWaypoint) {
             CycleOfLife();
             return;
         }
@@ -86,7 +85,7 @@ public class WalkingCrowd : Crowd
     public void CycleOfLife() {
         // Close enough to final waypoint. Time to kill
         // GG na
-        // Debug.Log("Such is the story of sun and moon, me and you, and everything else.");
+        // Debug.Log("Such is the story of the sun and the moon, me and you, and everything else.");
         bool shouldKill = (info.back && info.path.killAtStart) || (!info.back && info.path.killAtEnd);
 
         if (!shouldKill) {
@@ -95,6 +94,6 @@ public class WalkingCrowd : Crowd
         }
 
         info.path.Spawn(info.pathIdx, true);
-        Destroy(gameObject);
+        CommitSuicide();
     }
 }

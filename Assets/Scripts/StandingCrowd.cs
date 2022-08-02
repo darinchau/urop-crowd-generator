@@ -19,7 +19,13 @@ public class StandingCrowd : Crowd
     int destroyed = 0;
 
     public override void Update() {
-        if (countdown > 0) {
+        
+        base.Update();
+
+        if (destroyed == 2) {
+            return;
+        }
+        else if (countdown > 0) {
             NavMeshAgent n = GetComponent<NavMeshAgent>();
             n.SetDestination(info.spawnPos);
             countdown -= Time.deltaTime;
@@ -32,6 +38,10 @@ public class StandingCrowd : Crowd
         else if (destroyed == 1) {
             SetNavMesh();
             destroyed = 2;
+
+            // Now the human is stablized. We destroy it if it is not on screen anyway
+            if (!sc.IsInScreenArea(transform.position)) 
+                CommitSuicide();
         }
     }
 }

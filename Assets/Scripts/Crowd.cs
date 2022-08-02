@@ -14,10 +14,13 @@ public class Crowd : MonoBehaviour
     public static float radius = 0.3f;
     public static float height = 1.85f;
 
+    // Whether the human is close enough to the cp
+    [Range(0.1f, 10f)] public float closeEnoughDistance = 0.7f;
+    [Range(1f, 10f)] public float closeEnoughFinalDistance = 0.2f;
+
     // Start is called before the first frame update
     public virtual void Start()
     {
-        cm = CrowdManager.Instance;
         sc = ScreenCapturer.Instance;
     }
 
@@ -31,6 +34,8 @@ public class Crowd : MonoBehaviour
         info = i;
         SetNavMesh();
         gameObject.layer = 8;
+        cm = CrowdManager.Instance;
+        cm.RegisterPerson(this);
     }
 
     public virtual NavMeshAgent SetNavMesh() {
@@ -39,5 +44,10 @@ public class Crowd : MonoBehaviour
         n.radius = radius;
         n.height = height;
         return n;
+    }
+
+    public virtual void CommitSuicide() {
+        cm.DeregisterPerson(this);
+        Destroy(gameObject);
     }
 }

@@ -33,12 +33,6 @@ public struct CrowdInfo {
 
 public class CrowdManager : Singleton<CrowdManager>
 {
-    // The distance and angle in which we perform probing for other humans
-    public static float socialDistance = 0.3f;
-
-    // The distance and angle in which we perform probing for objects in the scene
-    public static float objectDistance = 1.2f;
-
     // The distance one must be close enough in order to diverge to a new path
     public float divergeThreshold = 5f;
 
@@ -49,13 +43,12 @@ public class CrowdManager : Singleton<CrowdManager>
     // Minimum time between two diverges
     [Range(1f, 10f)] public float minTimeBetweenDiverge = 15f;
 
-    // Whether the human is close enough to the cp
-    [Range(0.1f, 10f)] public float closeEnoughDistance = 1f;
-    [Range(1f, 10f)] public float closeEnoughFinalDistance = 0.2f;
-
     // A list to hold paths and all waypoints
     public List<Path> paths = new List<Path>();
     public List<GameObject> allWaypoints = new List<GameObject>();
+
+    // List that stores all humans
+    public List<Crowd> population = new List<Crowd>();
 
     public void RegisterPath(Path p) {
         paths.Add(p);
@@ -78,9 +71,24 @@ public class CrowdManager : Singleton<CrowdManager>
         return paths[0];
     }
 
+    // Register the person
+    public void RegisterPerson(Crowd c) {
+        population.Add(c);
+    }
+
+    // Deregister the person. This method should be called when the person is despawned. Returns true if the person is successfully removed from the list, false otherwise
+    public bool DeregisterPerson(Crowd c) {
+        try {
+            population.Remove(c);
+            return true;
+        }
+        catch {
+            return false;
+        }
+    }
+
     // returns true if successfully diverged, false otherwise
     // This is called like 10000 times a second so better to optimze the heck out of it
-    
     public bool CheckDiverge(Vector3 currentPos, ref CrowdInfo info, bool force = false) {
         if (info.divergable <= 0 || force) {
             // First optimization is to not actually do all the list operations and for loop stuff every frame

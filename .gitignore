@@ -72,5 +72,11 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
 
-# Paid Library. Please buy that and place it in the assets folder
+# Paid Library. Please buy that and place it in the assets folder, or alternatively, contact me if you need the files for other research purposes
+# yfdchau@connect.ust.hk
 /[Aa]ssets/Fantastic City Generator
+/[Aa]ssets/Fantastic City Generator.meta
+
+# Generated data
+/[Aa]ssets/[Dd]ata
+/[Aa]ssets/[Dd]ata.meta
