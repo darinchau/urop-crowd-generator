@@ -37,8 +37,8 @@ public class CrowdManager : Singleton<CrowdManager>
     public float divergeThreshold = 5f;
 
     // Rotation speed of humans
-    [Range(0.1f, 10f)] public float rotationSpeed = 1.3f;
-    [Range(0.1f, 10f)] public float avoidanceRotationSpeed = 2.2f;
+    // [Range(0.1f, 10f)] public float rotationSpeed = 1.3f;
+    // [Range(0.1f, 10f)] public float avoidanceRotationSpeed = 2.2f;
 
     // Minimum time between two diverges
     [Range(1f, 10f)] public float minTimeBetweenDiverge = 15f;
@@ -49,6 +49,9 @@ public class CrowdManager : Singleton<CrowdManager>
 
     // List that stores all humans
     public List<Crowd> population = new List<Crowd>();
+
+    // A number that manages and gives id to people
+    private int ID = 1;
 
     public void RegisterPath(Path p) {
         paths.Add(p);
@@ -71,9 +74,10 @@ public class CrowdManager : Singleton<CrowdManager>
         return paths[0];
     }
 
-    // Register the person
+    // Register the person. Gives it an ID and increments the ID.
     public void RegisterPerson(Crowd c) {
         population.Add(c);
+        c.id = ID++;
     }
 
     // Deregister the person. This method should be called when the person is despawned. Returns true if the person is successfully removed from the list, false otherwise

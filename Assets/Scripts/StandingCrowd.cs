@@ -40,7 +40,8 @@ public class StandingCrowd : Crowd
             destroyed = 2;
 
             // Now the human is stablized. We destroy it if it is not on screen anyway
-            if (!sc.IsInScreenArea(transform.position)) 
+            Vector2Int sp = new Vector2Int();
+            if (!sc.IsInScreenArea(transform.position, out sp)) 
                 CommitSuicide();
         }
     }
