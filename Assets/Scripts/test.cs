@@ -16,7 +16,7 @@ public class test : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        bool IsVisible = sc.IsPointVisible(transform.position, out Vector2Int pos);
+        bool IsVisible = sc.IsHumanVisible(transform.position, out Vector2Int pos);
         Debug.Log("Is visible? " + IsVisible.ToString() + " Position: " + pos.ToString());
     }
 }

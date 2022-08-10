@@ -36,6 +36,9 @@ public class CrowdManager : Singleton<CrowdManager>
     // The distance one must be close enough in order to diverge to a new path
     public float divergeThreshold = 5f;
 
+    // A kill switch for debug purposes
+    public static bool spawn = true;
+
     // Rotation speed of humans
     // [Range(0.1f, 10f)] public float rotationSpeed = 1.3f;
     // [Range(0.1f, 10f)] public float avoidanceRotationSpeed = 2.2f;
@@ -78,6 +81,10 @@ public class CrowdManager : Singleton<CrowdManager>
     public void RegisterPerson(Crowd c) {
         population.Add(c);
         c.id = ID++;
+
+        if (!spawn) {
+            c.CommitSuicide();
+        }
     }
 
     // Deregister the person. This method should be called when the person is despawned. Returns true if the person is successfully removed from the list, false otherwise

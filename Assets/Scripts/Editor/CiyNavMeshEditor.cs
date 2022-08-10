@@ -22,5 +22,10 @@ public class CityNavMeshEditor : Editor
         }
 
         EditorGUILayout.Space();
+
+        if (GUILayout.Button("Update Collider"))
+        {
+            m.UpdateCollider();
+        }
     }
 }

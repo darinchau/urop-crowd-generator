@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -11,8 +12,8 @@ public class Crowd : MonoBehaviour
     public ScreenCapturer sc;
 
     // Width and height of human
-    public static float radius = 0.3f;
-    public static float height = 1.85f;
+    public float radius = 0.3f;
+    public float height = 1.85f;
 
     // Whether the human is close enough to the cp
     [Range(0.1f, 10f)] public float closeEnoughDistance = 1.5f;
@@ -36,9 +37,15 @@ public class Crowd : MonoBehaviour
 
     // Register this person with the manager
     public virtual void InitializePerson(CrowdInfo i) {
+        // Set crowd info
         info = i;
+        //Set height
+        height = GetHeight();
+        // Set nav mesh
         SetNavMesh();
+        // Set raycast layer mask
         gameObject.layer = 8;
+        // Initialize yourself with the manager
         cm = CrowdManager.Instance;
         cm.RegisterPerson(this);
     }
@@ -56,14 +63,18 @@ public class Crowd : MonoBehaviour
     // Makes the order to kill itself if it has reached the end of its life
     public virtual void CommitSuicide() {
         cm.DeregisterPerson(this);
+        SkinnedMeshRenderer smr = gameObject.GetComponentInChildren<SkinnedMeshRenderer>();
+        Destroy(smr);
         Destroy(gameObject);
     }
 
     // Get all the vertices in the children of a gameobject
     // The vector 3s are local positions
+    // Actually let's have this list sorted from high to low
+    // It will be ever so useful
     public Vector3[] GetVertices() {
         // Get the renderer and make a new mesh
-        SkinnedMeshRenderer smr = gameObject.GetComponentInChildren<SkinnedMeshRenderer>();;
+        SkinnedMeshRenderer smr = gameObject.GetComponentInChildren<SkinnedMeshRenderer>();
         GameObject go = smr.gameObject;
         Mesh mesh = new Mesh();
 
@@ -74,12 +85,45 @@ public class Crowd : MonoBehaviour
         List<Vector3> lis = new List<Vector3>();
         mesh.GetVertices(lis);
 
+        List<Vector3> SortedList = lis.OrderBy(v => v.y).ToList();
+
         // The vector 3s are local positions
         // We know the objects are at most two layers deep so we can hard code lmao
-        for (int i = 0; i < lis.Count; i++) {
-            lis[i] = go.transform.TransformPoint(lis[i]);
+        for (int i = 0; i < SortedList.Count; i++) {
+            SortedList[i] = go.transform.TransformPoint(SortedList[i]);
         }
 
-        return lis.ToArray();
+        return SortedList.ToArray();
     }
+
+    // Get the height of the person
+    public float GetHeight() {
+        // Get all the vertices of the mesh
+        Vector3 [] vertices = GetVertices();
+
+        // // Keep track of the highest and lowest point of the human
+        // Vector3 highest = new Vector3();
+        // highest.y = -999;
+        // Vector3 lowest = new Vector3();
+        // lowest.y = 999;
+
+        // for (int i = 0; i < vertices.Length; i++) {
+        //     Vector3 v = vertices[i];
+        //     if (v.y > highest.y) {
+        //         highest = v;
+        //     } 
+            
+        //     if (v.y < lowest.y) {
+        //         lowest = v;
+        //     }
+        // }
+
+        Vector3 lowest = vertices[0];
+        Vector3 highest = vertices[vertices.Length - 1];
+
+        // Now we have the highest and lowest vector. Now calculate its height
+        return highest.y - lowest.y;
+    }
+
+    // Maybe also get the radius in the future?
 }
