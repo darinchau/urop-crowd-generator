@@ -1,7 +1,6 @@
 ### Processes the dataset to export format and make a video about it :D
 import os
 import json
-import h5py
 import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,7 +8,11 @@ import matplotlib.image as mpimg
 import os
 from moviepy.editor import *
 from scipy import ndimage
-from tqdm import trange
+from tqdm import tqdm
+from multiprocessing import Pool
+from abc import ABC, abstractmethod as virtual
+import random
+from p_tqdm import p_map
 
 # Path to dataset
 PATH = "./Data/Batch 43014179575"
@@ -17,23 +20,7 @@ PATH = "./Data/Batch 43014179575"
 # Draw a rectangle given the image, center, extents
 # My favourite mint color :))))
 COLOR = (62, 180, 137)
-
-# image is the image, bbs is the bounding boxes, in a numpy array of shape (N, 4)
-# bbs in the order left, top, right, bottom
-def add_bounding_box(img, bbs: list[tuple[int, int, int, int]], base_brightness = 0.5):
-    new_img = np.array(img * base_brightness, dtype = np.uint8)
-
-    col = np.array(COLOR, dtype = np.uint8)
-
-    for i in range(len(bbs)):
-        lef, top, rig, bot = bbs[i]
-
-        new_img[top, lef : rig, :] = col
-        new_img[bot, lef : rig, :] = col
-        new_img[top : bot, lef, :] = col
-        new_img[top : bot, rig, :] = col
-    
-    return new_img
+        
 
 # Performs string processing magic to turn the txt to json format
 def make_data():
@@ -96,115 +83,143 @@ def make_data():
     with open(f"{PATH}/position.json", 'w') as f:
         f.write(js)
 
-# Creates a video for demonstration
-def make_dem_video():
-    # Load the data
-    with open(f"{PATH}/position.json", 'r') as f:
-        st = f.read()
-    datas = json.loads(st)
+class VideoMaker:
+    def modifier(self, img, frame_data):
+        raise NotImplementedError
+    
+    # This texts will be appended every frame
+    def get_texts(self, img, frame_data):
+        return [
+            f"Number of people: {frame_data['Number of people']}",
+            f"Frame rate: {frame_data['Frame rate']}",
+            f"Project link: https://github.com/darinchau/crowd_counting",
+            f"Project link: https://github.com/darinchau/urop-crowd-generator"
+        ]
+    
+    def save(self, path: str, nframes: int = 300):
+        # Load the data
+        with open(f"{PATH}/position.json", 'r') as f:
+            st = f.read()
+        datas = json.loads(st)
 
-    # Process each frame by adding the bounding box
-    imgs = []
-    frame_rates = []
-    for i in trange(300, desc="Making demonstration video"):
-        img = mpimg.imread(f"{PATH}/Frame {i + 1}.png")
-        img = np.array(img * 255, dtype = np.uint8)
+        # Process each frame by adding the bounding box
+        def make_frame(i):
+            img = mpimg.imread(f"{PATH}/Frame {i + 1}.png")
+            img = np.array(img * 255, dtype = np.uint8)
+            frame_data = datas[f"{i + 1}"]
+            img = self.modifier(img, frame_data)
+            frame_rate = frame_data["Frame rate"]
 
-        # Add the bounding box
-        frame_data = datas[f"{i + 1}"]
+            font = cv.FONT_HERSHEY_SIMPLEX
+            color = (255, 255, 255)
+            imtext = np.zeros_like(img)
+            for i, text in enumerate(self.get_texts(img, frame_data)):
+                cv.putText(imtext, text, (80, 80 + 75 * i), fontFace = font, fontScale = 2, color = color, thickness=5)
+            img[imtext == 255] = 255
+            return img, frame_rate
+
+        img_data = p_map(make_frame, range(nframes))
+        self.make_vid(img_data, path)
+        
+    def make_vid(self, img_data, path):
+        # Write to the video
+        clips = [ImageClip(img).set_duration(1/frame_rate) for img, frame_rate in img_data]
+
+        video = concatenate(clips, method="compose")
+        video.write_videofile(path, fps=60)
+
+# Adds bounding box to video
+class BoundingBoxVideo(VideoMaker):
+    def modifier(self, img, frame_data):
         bbs = [(x["bounding box left"], x["bounding box top"], x["bounding box right"], x["bounding box bottom"]) for x in frame_data["People position"]]
         bbs = np.array(bbs)
-        img = add_bounding_box(img, bbs)
+        new_img = np.array(img * 0.5, dtype = np.uint8)
 
-        # Add some text
-        font = cv.FONT_HERSHEY_SIMPLEX
-        color = (255, 255, 255)
-        cv.putText(img, f"Number of people: {frame_data['Number of people']}", (80, 80), fontFace = font, fontScale = 2, color = color, thickness=5)
-        cv.putText(img, f"Frame rate: {frame_data['Frame rate']}", (80, 155), fontFace = font, fontScale = 2, color = color, thickness=5)
-        cv.putText(img, f"Project link: https://github.com/darinchau/crowd_counting", (80, 230), fontFace = font, fontScale = 2, color = color, thickness=5)
-        cv.putText(img, f"Project link: https://github.com/darinchau/urop-crowd-generator", (80, 305), fontFace = font, fontScale = 2, color = color, thickness=5)
+        col = np.array(COLOR, dtype = np.uint8)
 
-        imgs.append(img)
-        frame_rates.append(frame_data["Frame rate"])
+        for i in range(len(bbs)):
+            lef, top, rig, bot = bbs[i]
+
+            new_img[top, lef : rig, :] = col
+            new_img[bot, lef : rig, :] = col
+            new_img[top : bot, lef, :] = col
+            new_img[top : bot, rig, :] = col
+        
+        return new_img
     
-    # Write to the video
-    clips = [ImageClip(imgs[i]).set_duration(1/frame_rates[i]) for i in range(len(imgs))]
+    def get_texts(self, img, frame_data):
+        return [
+            f"Number of people: {frame_data['Number of people']}",
+            f"Frame rate: {frame_data['Frame rate']}",
+            f"Project link: https://github.com/darinchau/crowd_counting",
+            f"Project link: https://github.com/darinchau/urop-crowd-generator"
+        ]
 
-    video = concatenate(clips, method="compose")
-    video.write_videofile('test1.mp4', fps=60)
-
-# Modified from original code in preprocess.py
-# Turns coordinates to density image
-def coords_to_density_map(coords, sigma=15):
-    # sha is target output size
-    density = np.zeros((2160, 3840), dtype=np.float32)
-
-    # Loop through every coordinates
-    for i in trange(len(coords)):
-        # Tranlate coordinates from (img size) into (actual size)
-        x = int(coords[i][1])
-        y = int(coords[i][0])
-        pt2d = np.zeros((2160, 3840), dtype=np.float32)
-        try:
-            pt2d[x, y] = 1.
-        except:
-            pt2d[x-1, y-1] = 1.
-        density += ndimage.gaussian_filter(pt2d, sigma, mode='constant')
-
-    # I know how to plot a heatmap but I dont know how to plot it to a numpy array, so use this hacky workaround
-    fig = plt.figure(frameon=False)
-    fig.set_size_inches(3840/96, 2160/96)
-    ax = plt.Axes(fig, [0., 0., 1., 1.])
-    ax.set_axis_off()
-    fig.add_axes(ax)
-    ax.imshow(density, cmap = 'hot', aspect='auto')
-
-    # Save and load again
-    fig.savefig("./temp.png", dpi = 96)
-    new_img = mpimg.imread("./temp.png")
-    new_img = np.array(new_img * 255, dtype=np.uint8)
-    os.remove("temp.png")
-    plt.close('all')
-
-    return new_img
-
-# Make demonstration video about the density
-def make_dem_video_heatmap():
-    with open(f"{PATH}/position.json", 'r') as f:
-        st = f.read()
-    datas = json.loads(st)
-
-    # Process each frame by adding the bounding box
-    imgs = []
-    frame_rates = []
-    for i in trange(300):
-        # Add the bounding box
-        frame_data = datas[f"{i + 1}"]
+class DensityMapVideo(VideoMaker):
+    def modifier(self, img, frame_data):
+        # Extract the coordinates
         coords = [(x["x"], x["y"]) for x in frame_data["People position"]]
-        coords = np.array(coords)
-        img = coords_to_density_map(coords)
 
-        # Add some text
-        font = cv.FONT_HERSHEY_SIMPLEX
+        # The radius (pixels) of each person in the density map
+        sigma = 10
 
-        imtext = np.zeros_like(img)
-        cv.putText(imtext, f"Number of people: {frame_data['Number of people']}", (80, 80), fontFace = font, fontScale = 2, color = (255, 255, 255), thickness=5)
-        cv.putText(imtext, f"Frame rate: {frame_data['Frame rate']}", (80, 155), fontFace = font, fontScale = 2, color = (255, 255, 255), thickness=5)
-        cv.putText(imtext, f"Project link: https://github.com/darinchau/crowd_counting", (80, 230), fontFace = font, fontScale = 2, color = (255, 255, 255), thickness=5)
-        cv.putText(imtext, f"Project link: https://github.com/darinchau/urop-crowd-generator", (80, 305), fontFace = font, fontScale = 2, color = (255, 255, 255), thickness=5)
+        # Modified from original code in preprocess.py
+        # Turns coordinates to density image
+        density = np.zeros((1080, 1920), dtype=np.float32)
 
-        img[imtext == 255] = 255
+        # Loop through every coordinates
+        for x, y in coords:
+            # Tranlate coordinates from (img size) into (actual size)
+            a = int(y/2)
+            b = int(x/2)
+            pt2d = np.zeros((1080, 1920), dtype=np.float32)
+            try:
+                pt2d[a, b] = 1.
+            except IndexError:
+                pt2d[a-1, b-1] = 1.
+            density += ndimage.gaussian_filter(pt2d, sigma, mode='constant')
+        
+        # Resize the image up to 4k
+        density = cv.resize(density, (2160, 3840))
 
-        imgs.append(img)
-        frame_rates.append(frame_data["Frame rate"])
+        # I know how to plot a heatmap but I dont know how to plot it to a numpy array, so use this hacky workaround
+        # in multiprocessing I am worried about multiple images with the same name, hence make a random token
+        r = random.randint(0, 99999999999999999999999999)
+        path = f"./temp{r}.png"
+
+        fig = plt.figure(frameon=False)
+        fig.set_size_inches(3840/96, 2160/96)
+        ax = plt.Axes(fig, [0., 0., 1., 1.])
+        ax.set_axis_off()
+        fig.add_axes(ax)
+        ax.imshow(density, cmap = 'plasma', aspect='auto')
+
+        # Save and load again
+        fig.savefig(path, dpi = 96)
+        new_img = mpimg.imread(path)
+        new_img = np.array(new_img * 255, dtype=np.uint8)
+        os.remove(path)
+        plt.close(fig)
+
+        return new_img
+
+# Makes the original video with only a little bit of additional text
+class PureVideo(VideoMaker):
+    def modifier(self, img, frame_data):
+        return img
     
-    # Write to the video
-    clips = [ImageClip(imgs[i]).set_duration(1/frame_rates[i]) for i in range(len(imgs))]
-
-    video = concatenate(clips, method="compose")
-    video.write_videofile('density.mp4', fps=60)
+    def get_texts(self, img, frame_data):
+        return [
+            f"Darin Chau - Crowd counting project (Simulated data in Unity 3D + design & implement CNN model)",
+            "",
+            f"Project link: https://github.com/darinchau/crowd_counting",
+            f"Project link: https://github.com/darinchau/urop-crowd-generator"
+        ]
+    
+class PurerVideo(VideoMaker):
+    def modifier(self, img, frame_data):
+        return img
 
 if __name__ == "__main__":
-    make_dem_video()
-    make_dem_video_heatmap()
+    PurerVideo().save("vid.mp4")
     

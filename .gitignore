@@ -81,3 +81,5 @@ crashlytics-build.properties
 /[Aa]ssets/[Dd]ata
 /[Aa]ssets/[Dd]ata.meta
 /[Dd]ata
+*.mp4
+*.vpj
